@@ -1,0 +1,47 @@
+==== Ineeistent airflow user/role on postgres
+-> Identified through compose logs ('role "airflow" does not exist')
+
+line 31 compose.yaml
+ environment:
+      POSTGRES_USER: admin
+ environment:
+      POSTGRES_USER: airflow
+
+# [ALT] Create airflow user on postgres
+# psql -U admin -d airflow
+# CREATE USER airflow WITH PASSWORD 'airflow';
+# GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO airflow;
+# GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO airflow;
+
+==== Fix volume bind dags
+-> Identified before face the issue itself because I made a pre-check on the compose file before run it and saw the mount volume was not mathching with the current dag path on the repository.
+
+line 14 compose.yaml
+volumes:
+    - ./dag:/opt/airflow/dags
+volumes:
+    - ./dags:/opt/airflow/dags
+
+==== Fix health check webserver airflow
+-> Also identified before the issue itself since the port defined on the URL call didn't make sense, so I adjusted to use the same service exposed port.
+
+line 58 compose.yaml
+healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:xxxx/health"]
+healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+
+==== Change UID on airflow-common
+-> On the airflow-init step I was facing an error related to path permission ownership since the user set didn't have enough permissions to do it and as a consequence I was also facing an error on a DAG run since Airflow was not able to write the log output.
+
+line 17 compose.yaml
+user: "5000"
+user: "1000"
+UID from the user that runs the compose
+
+==== Fix syntax DAG
+-> Through the Airflow UI I could see the DAG import error related to a syntax error on the DAG code.
+
+line 12 smooth.py
+def smooth() <- missing colon
+def smooth():
